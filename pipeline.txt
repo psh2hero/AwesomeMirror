@@ -1,0 +1,14 @@
+< Whole Sequence >
+RGB input --> RGB2YUV --> Blemish w/ Y 
+                      --> Freckle w/ Y
+                      --> Decolorize w/ UV
+
+
+< Blemish >
+Y input --> Binarization w/ threshold --> Percentage Output
+
+< Freckle >
+Y input --> remove Blemish w/ threshold --> 기준 범위 밖의 비율
+
+< Decolorize >
+U,V input --> U의 값 비율 (0~128)
