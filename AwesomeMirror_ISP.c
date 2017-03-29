@@ -1,11 +1,20 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-void convertRgb2Gray(unsigned char *rgb, int wid, int hgt, unsigned char *gray);
-void convertRgb2Rb(unsigned char *rgb, int wid, int hgt, unsigned char *rb);
-void getBlemish(unsigned char *gray, int wid, int hgt, int gridX, int gridY, int *A);
-void getFreckle(unsigned char *gray, int wid, int hgt, int gridX, int gridY, int *B);
-void getDecolorize(unsigned char *rb, int wid, int hgt, int gridX, int gridY, int *C);
+typedef struct {
+	int startX;
+	int startY;
+	int endX;
+	int endY;
+	int wid;
+	int hgt;
+} ST_AREA;
+
+void convertRgb2Gray(unsigned char *rgb, int wid, int hgt, ST_AREA grid, unsigned char *gray);
+void convertRgb2Rb(unsigned char *rgb, int wid, int hgt, ST_AREA grid, unsigned char *rb);
+void getBlemish(unsigned char *gray, int wid, int hgt, int *A);
+void getFreckle(unsigned char *gray, int wid, int hgt, int *B);
+void getDecolorize(unsigned char *rb, int wid, int hgt, int *C);
 
 /************************************************************/
 // Function Name : GetSkinInfo
@@ -26,38 +35,76 @@ void GetSkinInfo(unsigned char *rgb, int wid, int hgt, int gridX, int gridY, int
 {
 	unsigned char *gray;
 	unsigned char *rb;
-		
-	gray = (unsigned char *)malloc(wid*hgt);
-	rb = (unsigned char *)malloc(wid*hgt);
+	int x_index, y_index, index;
+	ST_AREA grid;
+	float fStepX, fStepY;
 	
-	convertRgb2Gray(rgb, wid, hgt, gray);
-	convertRgb2Rb(rgb, wid, hgt, rb);
+	fStepX = wid / gridX;
+	fStepY = hgt / gridY;
 	
-	getBlemish(gray, wid, hgt, gridX, gridY, A);
-	getFreckle(gray, wid, hgt, gridX, gridY, B);
-	getDecolorize(rb, wid, hgt, gridX, gridY, C);
-	
-	free(gray);
-	free(rb);
-}
-
-void convertRgb2Gray(unsigned char *rgb, int wid, int hgt, unsigned char *gray)
-{
-	int i;
-	
-	for (i=0;i<wid*hgt;i++)
+	index = 0;
+	for (x_index=0;x_index<gridX;x_index++)
 	{
-		gray[i] = (rgb[i*3] + rgb[i*3+1] + rgb[i*3+2])/3;
+		for (y_index=0;y_index<gridY;y_index++)
+		{
+			grid.startX = (x_index*fStepX);
+			grid.startY = (y_index*fStepY);
+			grid.endX = ((x_index+1)*fStepX);
+			grid.endY = ((y_index+1)*fStepY);
+			grid.wid = grid.endX-grid.startX;
+			grid.hgt = grid.endY-grid.startY;
+			
+			gray = (unsigned char *)malloc(grid.wid*grid.hgt);
+			rb = (unsigned char *)malloc(grid.wid*grid.hgt);
+	
+			convertRgb2Gray(rgb, wid, hgt, grid, gray);
+			convertRgb2Rb(rgb, wid, hgt, grid, rb);
+	
+			getBlemish(gray, grid.wid, grid.hgt, A+index);
+			getFreckle(gray, grid.wid, grid.hgt, B+index);
+			getDecolorize(rb, grid.wid, grid.hgt, C+index);
+	
+			free(gray);
+			free(rb);
+			
+			index ++;
+		}
 	}
 }
 
-void convertRgb2Rb(unsigned char *rgb, int wid, int hgt, unsigned char *rb)
+void convertRgb2Gray(unsigned char *rgb, int wid, int hgt, ST_AREA grid, unsigned char *gray)
 {
-	int i;
+	int i, j, gray_index, rgb_index;
 	
-	for (i=0;i<wid*hgt;i++)
+	gray_index = 0;
+	for (i=grid.startY;i<grid.endY;i++)
 	{
-		rb[i] = (rgb[i*3+2] - rgb[i*3])/2 + 128;
+		rgb_index = i*wid + grid.startX;
+		for (j=grid.startX;j<grid.endX;j++)
+		{
+			gray[gray_index] = (rgb[rgb_index*3] + rgb[rgb_index*3+1] + rgb[rgb_index*3+2])/3;	
+			
+			gray_index ++;
+			rgb_index ++;
+		}
+	}
+}
+
+void convertRgb2Rb(unsigned char *rgb, int wid, int hgt, ST_AREA grid, unsigned char *rb)
+{
+	int i, j, rb_index, rgb_index;
+	
+	rb_index = 0;
+	for (i=grid.startY;i<grid.endY;i++)
+	{
+		rgb_index = i*wid + grid.startX;
+		for (j=grid.startX;j<grid.endX;j++)
+		{
+			rb[rb_index] = (rgb[rgb_index*3+2] - rgb[rgb_index*3])/2 + 128;;	
+			
+			rb_index ++;
+			rgb_index ++;
+		}
 	}
 }
 
@@ -96,7 +143,7 @@ void fnBlemish(unsigned char *gray, unsigned char *blemish, int w, int h)
 			if (start && (gray[i*w+j]-prev) > BLEMISH_LEVEL)
 			{
 				len = j - start;
-				if (len < BLEMISH_LEN && len > BLEMISH_LEN/2) 
+				if (len < BLEMISH_LEN /*&& len > BLEMISH_LEN/2*/) 
 				{
 					memset(blemishX + i*w + start, 255, j-start);	
 				}
@@ -147,37 +194,20 @@ void fnBlemish(unsigned char *gray, unsigned char *blemish, int w, int h)
 	free(blemishY);
 }
 
-void getBlemish(unsigned char *gray, int wid, int hgt, int gridX, int gridY, int *A)
+void getBlemish(unsigned char *gray, int wid, int hgt, int *A)
 {
-	int i, j, k, l;
-	int stepX = (wid+gridX-1)/gridX, stepY = (hgt+gridY-1)/gridY;
-	int countTotal, count, index;
-	
+	int i, count;
 	unsigned char *blemish;
 	
 	blemish = (unsigned char *)malloc(wid*hgt);
 	fnBlemish(gray, blemish, wid, hgt);
 	
-	index = 0;
-	for (i=0;i<hgt;i+=stepY)
+	count = 0;
+	for (i=0;i<hgt*wid;i++)
 	{
-		for (j=0;j<wid;j+=stepX)
-		{
-			countTotal = 0;
-			count = 0;
-			for (k=i;k<(i+stepY);k++)
-			{
-				if (k >= hgt) break;
-				for (l = j; l < (j+stepX); l++)
-				{
-					if (l >= wid) break;
-					countTotal ++;
-					if (blemish[k*wid+l] == 255) count++;
-				}
-			}
-			A[index++] = (1000*count)/countTotal;
-		}
+		if (blemish[i] == 255) count++;		
 	}
+	*A = count/8;
 	
 	free(blemish);
 }
@@ -340,65 +370,34 @@ void fnFreckle(unsigned char *gray, unsigned char *freckle, int w, int h)
 	free(median);
 }
 
-void getFreckle(unsigned char *gray, int wid, int hgt, int gridX, int gridY, int *B)
+void getFreckle(unsigned char *gray, int wid, int hgt, int *B)
 {
-	int i, j, k, l;
-	int stepX = (wid+gridX-1)/gridX, stepY = (hgt+gridY-1)/gridY;
-	int countTotal, count, index;
+	int i;
+	int count;
 	
 	unsigned char *freckle;
 	
 	freckle = (unsigned char *)malloc(wid*hgt);
 	fnFreckle(gray, freckle, wid, hgt);
 	
-	index = 0;
-	for (i=0;i<hgt;i+=stepY)
+	for (i=0;i<hgt*wid;i++)
 	{
-		for (j=0;j<wid;j+=stepX)
-		{
-			countTotal = 0;
-			count = 0;
-			for (k=i;k<(i+stepY);k++)
-			{
-				if (k >= hgt) break;
-				for (l = j; l < (j+stepX); l++)
-				{
-					if (l >= wid) break;
-					countTotal ++;
-					if (freckle[k*wid+l] == 255) count++;
-				}
-			}
-			B[index++] = (1000*count)/countTotal;
-		}
+		if (freckle[i] == 255) count++;
 	}
 	
+	*B = (count/8);
 	free(freckle);	
 }
 
-void getDecolorize(unsigned char *rb, int wid, int hgt, int gridX, int gridY, int *C)
+void getDecolorize(unsigned char *rb, int wid, int hgt, int *C)
 {
-	int i, j, k, l;
-	int stepX = (wid+gridX-1)/gridX, stepY = (hgt+gridY-1)/gridY;
-	int countTotal, rbSum, index;
-	
-	index = 0;
-	for (i=0;i<hgt;i+=stepY)
+	int i;
+	int count, rbSum;
+
+	rbSum = 0;	
+	for (i=0;i<hgt*wid;i++)
 	{
-		for (j=0;j<wid;j+=stepX)
-		{
-			countTotal = 0;
-			rbSum = 0;
-			for (k=i;k<(i+stepY);k++)
-			{
-				if (k >= hgt) break;
-				for (l = j; l < (j+stepX); l++)
-				{
-					if (l >= wid) break;
-					countTotal++;
-					rbSum += rb[k*wid+l];
-				}
-			}
-			C[index++] = rbSum/countTotal;
-		}
+		rbSum += rb[i];
 	}
+	*C = rbSum/(wid*hgt);
 }
