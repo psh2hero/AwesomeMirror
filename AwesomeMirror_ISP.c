@@ -67,6 +67,11 @@ void GetSkinInfo(unsigned char *rgb, int wid, int hgt, int gridX, int gridY, int
 			free(gray);
 			free(rb);
 			
+			/* Percent Conversion */
+			A[index] = A[index] /10;
+			B[index] = B[index] /10;
+			C[index] = (C[index]>128)?(C[index]-128)*100/128:(128-C[index])*100/128;
+
 			index ++;
 		}
 	}
