@@ -1,8 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-
-
 void savePGMFile(unsigned char *blemish, char *filename, int w, int h);
 void fnBlemish(unsigned char *gray, unsigned char *blemish, int w, int h);
 

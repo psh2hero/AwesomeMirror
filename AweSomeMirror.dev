@@ -51,7 +51,7 @@ AutoIncBuildNr=0
 SyncProduct=1
 
 [Unit1]
-FileName=AwesomeMirror_ISP.c
+FileName=AwesomeMirror_ISP2.c
 CompileCpp=0
 Folder=
 Compile=1
